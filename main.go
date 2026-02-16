@@ -13,8 +13,9 @@ import (
 )
 
 type apiConfig struct {
-	fileserverHits atomic.Int32
+	db             *sql.DB
 	queries        *database.Queries
+	fileserverHits atomic.Int32
 	platform       string
 }
 
@@ -23,7 +24,8 @@ func main() {
 	const port = "8080"
 
 	mux := http.NewServeMux()
-	apiCfg := loadApiConfig()
+	apiCfg := loadAPIConfig()
+	defer apiCfg.db.Close()
 
 	fileServerHandler := http.StripPrefix("/app", http.FileServer(http.Dir(filePathRoot)))
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(fileServerHandler))
@@ -42,7 +44,7 @@ func main() {
 	log.Fatal(server.ListenAndServe())
 }
 
-func loadApiConfig() *apiConfig {
+func loadAPIConfig() *apiConfig {
 	godotenv.Load()
 
 	dbURL := os.Getenv("DB_URL")
@@ -65,8 +67,9 @@ func loadApiConfig() *apiConfig {
 	dbQueries := database.New(db)
 
 	apiCfg := &apiConfig{
-		fileserverHits: atomic.Int32{},
+		db:             db,
 		queries:        dbQueries,
+		fileserverHits: atomic.Int32{},
 		platform:       platform,
 	}
 
