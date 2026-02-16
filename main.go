@@ -15,13 +15,47 @@ import (
 type apiConfig struct {
 	fileserverHits atomic.Int32
 	queries        *database.Queries
+	platform       string
 }
 
 func main() {
-	godotenv.Load()
 	const filePathRoot = "."
 	const port = "8080"
+
+	mux := http.NewServeMux()
+	apiCfg := loadApiConfig()
+
+	fileServerHandler := http.StripPrefix("/app", http.FileServer(http.Dir(filePathRoot)))
+	mux.Handle("/app/", apiCfg.middlewareMetricsInc(fileServerHandler))
+	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerMetrics)
+	mux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
+
+	mux.HandleFunc("GET /api/healthz", handlerReadiness)
+	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
+	mux.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
+
+	server := http.Server{
+		Handler: mux,
+		Addr:    ":" + port,
+	}
+	log.Printf("Serving on port: %s\n", port)
+	log.Fatal(server.ListenAndServe())
+}
+
+func loadApiConfig() *apiConfig {
+	godotenv.Load()
+
 	dbURL := os.Getenv("DB_URL")
+	platform := os.Getenv("PLATFORM")
+
+	if dbURL == "" {
+		log.Fatal("DB_URL must be set")
+	}
+
+	if platform == "" {
+		log.Fatal("PLATFORM must be set")
+	}
+
 	db, err := sql.Open("postgres", dbURL)
 
 	if err != nil {
@@ -33,22 +67,8 @@ func main() {
 	apiCfg := &apiConfig{
 		fileserverHits: atomic.Int32{},
 		queries:        dbQueries,
+		platform:       platform,
 	}
 
-	mux := http.NewServeMux()
-
-	fileServerHandler := http.StripPrefix("/app", http.FileServer(http.Dir(filePathRoot)))
-	mux.Handle("/app/", apiCfg.middlewareMetricsInc(fileServerHandler))
-	mux.HandleFunc("GET /api/healthz", handlerReadiness)
-	mux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
-
-	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerMetrics)
-	mux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
-
-	server := http.Server{
-		Handler: mux,
-		Addr:    ":" + port,
-	}
-	log.Printf("Serving on port: %s\n", port)
-	log.Fatal(server.ListenAndServe())
+	return apiCfg
 }
