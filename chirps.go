@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -86,6 +87,41 @@ func (c *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondWithJson(w, http.StatusOK, chirps)
+}
+
+func (c *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request) {
+	type response struct {
+		Chirp
+	}
+
+	pathID := r.PathValue("chirpID")
+	id, err := uuid.Parse(pathID)
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "You must provide a valid chirp id", err)
+		return
+	}
+
+	dbChirp, err := c.queries.GetChirp(r.Context(), id)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			respondWithError(w, http.StatusNotFound, "Chirp not found", err)
+			return
+		}
+		respondWithError(w, http.StatusInternalServerError, "Couldn't get chirp", err)
+		return
+	}
+
+	respondWithJson(w, http.StatusOK, response{
+		Chirp{
+			ID:        dbChirp.ID,
+			CreatedAt: dbChirp.CreatedAt,
+			UpdatedAt: dbChirp.UpdatedAt,
+			Body:      dbChirp.Body,
+			UserID:    dbChirp.UserID,
+		},
+	})
 }
 
 func validateChirp(body string) (string, error) {
