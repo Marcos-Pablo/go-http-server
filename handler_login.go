@@ -5,18 +5,21 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/Marcos-Pablo/go-http-server/internal/auth"
 )
 
 func (c *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email            string `json:"email"`
+		Password         string `json:"password"`
+		ExpiresInSeconds int    `json:"expires_in_seconds"`
 	}
 
 	type response struct {
 		User
+		Token string `json:"token"`
 	}
 
 	var params parameters
@@ -51,6 +54,18 @@ func (c *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	expiresIn := time.Hour
+	if params.ExpiresInSeconds > 0 && params.ExpiresInSeconds < 3600 {
+		expiresIn = time.Duration(params.ExpiresInSeconds) * time.Second
+	}
+
+	token, err := auth.MakeJWT(user.ID, c.jwtKey, expiresIn)
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't make JWT", err)
+		return
+	}
+
 	respondWithJson(w, http.StatusOK, response{
 		User: User{
 			ID:        user.ID,
@@ -58,5 +73,6 @@ func (c *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 			UpdatedAt: user.UpdatedAt,
 			Email:     user.Email,
 		},
+		Token: token,
 	})
 }

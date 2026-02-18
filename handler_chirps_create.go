@@ -6,23 +6,36 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Marcos-Pablo/go-http-server/internal/auth"
 	"github.com/Marcos-Pablo/go-http-server/internal/database"
-	"github.com/google/uuid"
 )
 
 func (c *apiConfig) handlerChirpsCreate(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Body   string    `json:"body"`
-		UserID uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
 	}
 
 	type response struct {
 		Chirp
 	}
 
+	bearerToken, err := auth.GetBearerToken(r.Header)
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid authorization header", err)
+		return
+	}
+
+	userID, err := auth.ValidateJWT(bearerToken, c.jwtKey)
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid JWT token", err)
+		return
+	}
+
 	var params parameters
 
-	err := json.NewDecoder(r.Body).Decode(&params)
+	err = json.NewDecoder(r.Body).Decode(&params)
 
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid JSON body", err)
@@ -38,7 +51,7 @@ func (c *apiConfig) handlerChirpsCreate(w http.ResponseWriter, r *http.Request) 
 
 	chirp, err := c.queries.CreateChirp(r.Context(), database.CreateChirpParams{
 		Body:   cleaned,
-		UserID: params.UserID,
+		UserID: userID,
 	})
 
 	if err != nil {
