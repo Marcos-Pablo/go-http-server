@@ -18,6 +18,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	platform       string
 	jwtKey         string
+	polkaKey       string
 }
 
 func main() {
@@ -63,6 +64,7 @@ func loadAPIConfig() *apiConfig {
 	dbURL := os.Getenv("DB_URL")
 	platform := os.Getenv("PLATFORM")
 	jwtKey := os.Getenv("JWT_KEY")
+	polkaKey := os.Getenv("POLKA_KEY")
 
 	if dbURL == "" {
 		log.Fatal("DB_URL must be set")
@@ -74,6 +76,10 @@ func loadAPIConfig() *apiConfig {
 
 	if jwtKey == "" {
 		log.Fatal("JWT_KEY must be set")
+	}
+
+	if polkaKey == "" {
+		log.Fatal("POLKA_KEY must be set")
 	}
 
 	db, err := sql.Open("postgres", dbURL)
@@ -90,6 +96,7 @@ func loadAPIConfig() *apiConfig {
 		fileserverHits: atomic.Int32{},
 		platform:       platform,
 		jwtKey:         jwtKey,
+		polkaKey:       polkaKey,
 	}
 
 	return apiCfg

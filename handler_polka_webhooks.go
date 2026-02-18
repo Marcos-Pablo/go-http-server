@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/Marcos-Pablo/go-http-server/internal/auth"
 	"github.com/google/uuid"
 )
 
@@ -23,7 +24,14 @@ func (c *apiConfig) handlerPolkaWebhooks(w http.ResponseWriter, r *http.Request)
 
 	var params parameters
 
-	err := json.NewDecoder(r.Body).Decode(&params)
+	apiKey, err := auth.GetAPIKey(r.Header)
+
+	if err != nil || apiKey != c.polkaKey {
+		respondWithError(w, http.StatusUnauthorized, "Invalid api key", err)
+		return
+	}
+
+	err = json.NewDecoder(r.Body).Decode(&params)
 
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Invalid JSON body", err)
