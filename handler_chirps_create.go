@@ -29,7 +29,7 @@ func (c *apiConfig) handlerChirpsCreate(w http.ResponseWriter, r *http.Request) 
 	userID, err := auth.ValidateJWT(bearerToken, c.jwtKey)
 
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, "Invalid JWT token", err)
+		respondWithError(w, http.StatusUnauthorized, "Invalid JWT token", err)
 		return
 	}
 

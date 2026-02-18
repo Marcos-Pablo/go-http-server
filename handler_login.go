@@ -8,18 +8,19 @@ import (
 	"time"
 
 	"github.com/Marcos-Pablo/go-http-server/internal/auth"
+	"github.com/Marcos-Pablo/go-http-server/internal/database"
 )
 
 func (c *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
-		Email            string `json:"email"`
-		Password         string `json:"password"`
-		ExpiresInSeconds int    `json:"expires_in_seconds"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
 
 	type response struct {
 		User
-		Token string `json:"token"`
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
 	}
 
 	var params parameters
@@ -54,15 +55,28 @@ func (c *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	expiresIn := time.Hour
-	if params.ExpiresInSeconds > 0 && params.ExpiresInSeconds < 3600 {
-		expiresIn = time.Duration(params.ExpiresInSeconds) * time.Second
-	}
-
-	token, err := auth.MakeJWT(user.ID, c.jwtKey, expiresIn)
+	token, err := auth.MakeJWT(user.ID, c.jwtKey, time.Hour)
 
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't make JWT", err)
+		return
+	}
+
+	refreshTokenStr, err := auth.MakeRefreshToken()
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't refresh token", err)
+		return
+	}
+
+	refreshToken, err := c.queries.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
+		Token:     refreshTokenStr,
+		UserID:    user.ID,
+		ExpiresAt: time.Now().Add(time.Hour * 24 * 60),
+	})
+
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't store refresh token", err)
 		return
 	}
 
@@ -73,6 +87,7 @@ func (c *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 			UpdatedAt: user.UpdatedAt,
 			Email:     user.Email,
 		},
-		Token: token,
+		Token:        token,
+		RefreshToken: refreshToken.Token,
 	})
 }
