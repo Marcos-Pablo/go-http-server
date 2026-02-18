@@ -53,7 +53,7 @@ func TestJWT(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			token, err := MakeJWT(tt.userID, tt.signingSecret, tt.expiresIn)
 			if err != nil {
-				t.Errorf("Failed to generate JWT: %s", err)
+				t.Fatalf("Failed to generate JWT: %s", err)
 			}
 
 			userID, err := ValidateJWT(token, tt.validationSecret)

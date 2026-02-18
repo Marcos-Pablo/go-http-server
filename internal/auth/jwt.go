@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -8,21 +9,28 @@ import (
 	"github.com/google/uuid"
 )
 
+type TokenType string
+
+const (
+	TokenTypeAccess TokenType = "chirpy-access"
+)
+
 func MakeJWT(userID uuid.UUID, tokenSecret string, expiresIn time.Duration) (string, error) {
+	signingKey := []byte(tokenSecret)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Issuer:    "chirpy-access",
+		Issuer:    string(TokenTypeAccess),
 		IssuedAt:  jwt.NewNumericDate(time.Now()),
 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(expiresIn)),
 		Subject:   userID.String(),
 	})
 
-	signedStr, err := token.SignedString([]byte(tokenSecret))
+	signedJWT, err := token.SignedString(signingKey)
 
 	if err != nil {
 		return "", fmt.Errorf("Couldn't create jwt token: %w", err)
 	}
 
-	return signedStr, nil
+	return signedJWT, nil
 }
 
 func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
@@ -31,19 +39,29 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 	})
 
 	if err != nil {
-		return uuid.UUID{}, fmt.Errorf("Couldn't validate JWT: %w", err)
+		return uuid.Nil, err
+	}
+
+	issuer, err := token.Claims.GetIssuer()
+
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	if issuer != string(TokenTypeAccess) {
+		return uuid.Nil, errors.New("invalid issuer")
 	}
 
 	subject, err := token.Claims.GetSubject()
 
 	if err != nil {
-		return uuid.UUID{}, fmt.Errorf("Couldn't validate JWT: %w", err)
+		return uuid.Nil, err
 	}
 
 	userID, err := uuid.Parse(subject)
 
 	if err != nil {
-		return uuid.UUID{}, fmt.Errorf("Couldn't validate JWT: %w", err)
+		return uuid.UUID{}, fmt.Errorf("Invalid user ID: %w", err)
 	}
 	return userID, nil
 }
