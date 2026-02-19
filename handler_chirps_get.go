@@ -5,11 +5,35 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/Marcos-Pablo/go-http-server/internal/database"
 	"github.com/google/uuid"
 )
 
+func authorIDFromRequest(r *http.Request) (uuid.UUID, error) {
+	authorIDString := r.URL.Query().Get("author_id")
+	if authorIDString == "" {
+		return uuid.Nil, nil
+	}
+	authorID, err := uuid.Parse(authorIDString)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return authorID, nil
+}
+
 func (c *apiConfig) handlerChirpsList(w http.ResponseWriter, r *http.Request) {
-	dbChirps, err := c.queries.GetChirps(r.Context())
+	authorID, err := authorIDFromRequest(r)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Invalid author ID", err)
+		return
+	}
+
+	var dbChirps []database.Chirp
+	if authorID != uuid.Nil {
+		dbChirps, err = c.queries.GetChirpsByAuthor(r.Context(), authorID)
+	} else {
+		dbChirps, err = c.queries.GetChirps(r.Context())
+	}
 
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't get chirps", err)
