@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
+	"sort"
 
 	"github.com/Marcos-Pablo/go-http-server/internal/database"
 	"github.com/google/uuid"
@@ -28,6 +29,13 @@ func (c *apiConfig) handlerChirpsList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	sortParam := r.URL.Query().Get("sort")
+	sortDirection := asc // default
+
+	if sortParam == string(desc) {
+		sortDirection = desc
+	}
+
 	var dbChirps []database.Chirp
 	if authorID != uuid.Nil {
 		dbChirps, err = c.queries.GetChirpsByAuthor(r.Context(), authorID)
@@ -48,6 +56,12 @@ func (c *apiConfig) handlerChirpsList(w http.ResponseWriter, r *http.Request) {
 			UpdatedAt: dbChirp.UpdatedAt,
 			Body:      dbChirp.Body,
 			UserID:    dbChirp.UserID,
+		})
+	}
+
+	if sortDirection == desc {
+		sort.Slice(chirps, func(i, j int) bool {
+			return chirps[j].CreatedAt.Before(chirps[i].CreatedAt)
 		})
 	}
 

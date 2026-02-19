@@ -22,3 +22,10 @@ type Chirp struct {
 	Body      string    `json:"body"`
 	UserID    uuid.UUID `json:"user_id"`
 }
+
+type Sorting string
+
+const (
+	asc  Sorting = "asc"
+	desc Sorting = "desc"
+)
